@@ -8,4 +8,4 @@ RUN bun install
 
 RUN bun deploy-commands
 
-CMD ["bun", "run", "index.ts"]
+CMD ["bun", "start"]
