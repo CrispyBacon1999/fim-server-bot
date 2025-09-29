@@ -1,6 +1,6 @@
 import { readdir } from "fs/promises";
 import { join } from "path";
-import { ChannelType, Client, Collection, Events, GatewayIntentBits } from "discord.js";
+import { ChannelType, Client, Collection, EmbedBuilder, Events, GatewayIntentBits } from "discord.js";
 import { voiceHandler } from "./modules/voice";
 import { reputationHandler } from "./modules/rep";
 import { Cron } from "croner";
@@ -88,7 +88,18 @@ const repReset = new Cron("0 12 1 * *", async () => {
     const channel = await client.guilds.cache.get(guild.guildId)?.channels.cache.get(config?.leaderboardChannelId!);
 
     if (channel && channel.type === ChannelType.GuildText) {
-      await channel.send({ content: `Leaderboard for ${guild.guildId}: ${leaderboard.map(l => `<@${l.authorId}> (${l.count})`).join("\n")}` });
+      const embed = new EmbedBuilder()
+        .setTitle("Reputation Leaderboard")
+        .setDescription(
+          leaderboard
+            .map(
+              (l, i) =>
+                `**${i + 1}.** ${l.authorUsername} — \`${l.count}\``
+            )
+            .join("\n")
+        )
+        .setColor(0x00AE86);
+      await channel.send({ embeds: [embed] });
     }
 
     console.log(`Resetting reputation leaderboard for ${guild.guildId}`);
