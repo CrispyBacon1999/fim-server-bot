@@ -1,13 +1,20 @@
 import { readdir } from "fs/promises";
 import { join } from "path";
-import { Client, Collection, Events, GatewayIntentBits } from "discord.js";
+import { ChannelType, Client, Collection, Events, GatewayIntentBits } from "discord.js";
 import { voiceHandler } from "./modules/voice";
+import { reputationHandler } from "./modules/rep";
+import { Cron } from "croner";
+import { db } from "./db/db";
+import { reputationMessageConfigTable, reputationMessageTable } from "./db/schema";
+import { eq } from "drizzle-orm";
 
 const client = new Client({
   intents: [
+    GatewayIntentBits.MessageContent,
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildVoiceStates,
-    GatewayIntentBits.GuildPresences
+    GatewayIntentBits.GuildPresences,
+    GatewayIntentBits.GuildMessages,
   ]
 });
 
@@ -51,5 +58,36 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
   voiceHandler(client, oldState, newState);
 })
 
+client.on(Events.MessageCreate, (message) => {
+  reputationHandler(client, message);
+});
 
 client.login(process.env.DISCORD_TOKEN);
+
+// Send the leaderboard message every month and reset the database
+const repReset = new Cron("0 12 1 * *", async () => {
+  console.log("Resetting reputation leaderboards");
+  const guildsWithRep = await db.selectDistinct({ guildId: reputationMessageTable.guildId }).from(reputationMessageTable);
+
+  for (const guild of guildsWithRep) {
+    const leaderboard = await db.select({
+      authorId: reputationMessageTable.authorId,
+      authorUsername: reputationMessageTable.authorUsername,
+      count: db.$count(reputationMessageTable.messageId),
+    }).from(reputationMessageTable).where(eq(reputationMessageTable.guildId, guild.guildId));
+
+    const config = await db.query.reputationMessageConfigTable.findFirst({
+      where: eq(reputationMessageConfigTable.guildId, guild.guildId),
+    })
+
+    const channel = await client.guilds.cache.get(guild.guildId)?.channels.cache.get(config?.leaderboardChannelId!);
+
+    if (channel && channel.type === ChannelType.GuildText) {
+      await channel.send({ content: `Leaderboard for ${guild.guildId}: ${leaderboard.map(l => `<@${l.authorId}> (${l.count})`).join("\n")}` });
+    }
+
+    console.log(`Resetting reputation leaderboard for ${guild.guildId}`);
+    await db.delete(reputationMessageTable).where(eq(reputationMessageTable.guildId, guild.guildId));
+  }
+
+});

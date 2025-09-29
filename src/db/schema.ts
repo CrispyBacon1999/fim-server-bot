@@ -24,3 +24,15 @@ export const voiceChannelConfigTable = mysqlTable("voice_channel_configs", {
   editableByCreator: boolean().notNull().default(true),
   name: varchar({ length: 20 }).default("VC")
 })
+
+export const reputationMessageTable = mysqlTable("reputation_messages", {
+  messageId: varchar({ length: 32 }).primaryKey(),
+  authorId: varchar({ length: 32 }).notNull(),
+  authorUsername: varchar({ length: 64 }).notNull(),
+  guildId: varchar({ length: 32 }).notNull(),
+})
+
+export const reputationMessageConfigTable = mysqlTable("reputation_message_configs", {
+  guildId: varchar({ length: 32 }).primaryKey(),
+  leaderboardChannelId: varchar({ length: 32 }).notNull(),
+})
