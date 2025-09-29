@@ -6,7 +6,7 @@ import { reputationHandler } from "./modules/rep";
 import { Cron } from "croner";
 import { db } from "./db/db";
 import { reputationMessageConfigTable, reputationMessageTable } from "./db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 const client = new Client({
   intents: [
@@ -70,11 +70,16 @@ const repReset = new Cron("0 12 1 * *", async () => {
   const guildsWithRep = await db.selectDistinct({ guildId: reputationMessageTable.guildId }).from(reputationMessageTable);
 
   for (const guild of guildsWithRep) {
-    const leaderboard = await db.select({
-      authorId: reputationMessageTable.authorId,
-      authorUsername: reputationMessageTable.authorUsername,
-      count: db.$count(reputationMessageTable.messageId),
-    }).from(reputationMessageTable).where(eq(reputationMessageTable.guildId, guild.guildId));
+    const leaderboard = await db
+      .select({
+        authorId: reputationMessageTable.authorId,
+        authorUsername: reputationMessageTable.authorUsername,
+        count: sql<number>`COUNT(${reputationMessageTable.messageId})`,
+      })
+      .from(reputationMessageTable)
+      .where(eq(reputationMessageTable.guildId, guild.guildId))
+      .groupBy(reputationMessageTable.authorId, reputationMessageTable.authorUsername)
+      .orderBy(sql`COUNT(*) DESC`);
 
     const config = await db.query.reputationMessageConfigTable.findFirst({
       where: eq(reputationMessageConfigTable.guildId, guild.guildId),

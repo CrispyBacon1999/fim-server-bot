@@ -20,7 +20,7 @@ export async function reputationHandler(client: Client, message: Message) {
 
   // Has this already been awarded rep?
   const hasAlreadyBeenAwardedRep = await db.query.reputationMessageTable.findFirst({
-    where: eq(reputationMessageTable.messageId, message.id),
+    where: eq(reputationMessageTable.messageId, message.reference.messageId),
   })
   if (hasAlreadyBeenAwardedRep) return;
 
