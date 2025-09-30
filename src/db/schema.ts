@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { mysqlTable, varchar, int, boolean } from "drizzle-orm/mysql-core";
+import { mysqlTable, varchar, int, boolean, primaryKey } from "drizzle-orm/mysql-core";
 
 export const voiceChannelTable = mysqlTable("voice_channels", {
   id: varchar({ length: 32 }).primaryKey(),
@@ -26,11 +26,13 @@ export const voiceChannelConfigTable = mysqlTable("voice_channel_configs", {
 })
 
 export const reputationMessageTable = mysqlTable("reputation_messages", {
-  messageId: varchar({ length: 32 }).primaryKey(),
-  authorId: varchar({ length: 32 }).notNull(),
+  messageId: varchar({ length: 32 }),
+  authorId: varchar({ length: 32 }),
   authorUsername: varchar({ length: 64 }).notNull(),
   guildId: varchar({ length: 32 }).notNull(),
-})
+}, (table) => [
+  primaryKey({ columns: [table.messageId, table.authorId] }),
+]);
 
 export const reputationMessageConfigTable = mysqlTable("reputation_message_configs", {
   guildId: varchar({ length: 32 }).primaryKey(),

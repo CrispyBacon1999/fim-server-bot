@@ -7,6 +7,31 @@ import { isThankingReply } from "../ai/openrouter";
 export async function reputationHandler(client: Client, message: Message) {
   if (message.author.bot) return;
 
+  const mentionedUsers = message.mentions.users;
+
+  mentionedUsers.delete(message.author.id);
+
+  if (mentionedUsers.size > 0) {
+    const isThankMessage = await isThankingReply(message.content);
+
+    if (!isThankMessage) return;
+
+    const users = Array.from(mentionedUsers.values());
+    for (const user of users) {
+      await db.insert(reputationMessageTable).values({
+        messageId: message.id,
+        authorId: user.id,
+        authorUsername: user.username,
+        guildId: message.guild?.id!,
+      });
+    }
+    const mentions = users.map((u) => `<@${u.id}>`).join(", ");
+    const verb = users.length === 1 ? "has" : "have";
+    await message.reply({ content: `${mentions} ${verb} been been awarded 1 rep!` });
+
+    return;
+  }
+
   if (!message.reference?.messageId) return;
 
   const referenceMessage = await message.channel.messages.fetch(message.reference.messageId);
