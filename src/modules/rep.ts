@@ -10,11 +10,13 @@ export async function reputationHandler(client: Client, message: Message) {
   const mentionedUsers = message.mentions.users;
 
   mentionedUsers.delete(message.author.id);
+  mentionedUsers.delete(client.user?.id!);
 
   if (mentionedUsers.size > 0) {
     const isThankMessage = await isThankingReply(message.content);
 
     if (!isThankMessage) return;
+
 
     const users = Array.from(mentionedUsers.values());
     for (const user of users) {
@@ -27,7 +29,7 @@ export async function reputationHandler(client: Client, message: Message) {
     }
     const mentions = users.map((u) => `<@${u.id}>`).join(", ");
     const verb = users.length === 1 ? "has" : "have";
-    await message.reply({ content: `${mentions} ${verb} been been awarded 1 rep!` });
+    await message.reply({ content: `${mentions} ${verb} been awarded 1 rep!` });
 
     return;
   }
@@ -38,6 +40,9 @@ export async function reputationHandler(client: Client, message: Message) {
 
   // Can't thank yourself
   if (message.author.id === referenceMessage.author.id) return;
+
+  // Can't thank the bot
+  if (referenceMessage.author.id === client.user?.id!) return;
 
   // Has this already been awarded rep?
   const hasAlreadyBeenAwardedRep = await db.query.reputationMessageTable.findFirst({
