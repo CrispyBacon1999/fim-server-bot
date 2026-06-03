@@ -6,6 +6,4 @@ COPY . .
 
 RUN bun install
 
-# RUN bun deploy-commands
-
-CMD ["bun", "start"]
+CMD ["sh", "-c", "bun deploy-commands && bun start"]

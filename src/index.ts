@@ -3,6 +3,7 @@ import { join } from "path";
 import { ChannelType, Client, Collection, EmbedBuilder, Events, GatewayIntentBits } from "discord.js";
 import { voiceHandler } from "./modules/voice";
 import { reputationHandler } from "./modules/rep";
+import { honeypotHandler } from "./modules/honeypot";
 import { Cron } from "croner";
 import { db } from "./db/db";
 import { reputationMessageConfigTable, reputationMessageTable } from "./db/schema";
@@ -58,7 +59,10 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
   voiceHandler(client, oldState, newState);
 })
 
-client.on(Events.MessageCreate, (message) => {
+client.on(Events.MessageCreate, async (message) => {
+  const handledByHoneypot = await honeypotHandler(client, message);
+  if (handledByHoneypot) return;
+
   reputationHandler(client, message);
 });
 

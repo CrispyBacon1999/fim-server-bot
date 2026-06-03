@@ -38,3 +38,9 @@ export const reputationMessageConfigTable = mysqlTable("reputation_message_confi
   guildId: varchar({ length: 32 }).primaryKey(),
   leaderboardChannelId: varchar({ length: 32 }).notNull(),
 })
+
+export const honeypotConfigTable = mysqlTable("honeypot_configs", {
+  guildId: varchar({ length: 32 }).primaryKey(),
+  channelId: varchar({ length: 32 }).notNull(),
+  staffChannelId: varchar({ length: 32 }).notNull(),
+})
