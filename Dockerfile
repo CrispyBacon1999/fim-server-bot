@@ -6,4 +6,4 @@ COPY . .
 
 RUN bun install
 
-CMD ["sh", "-c", "bun deploy-commands && bun start"]
+CMD ["sh", "-c", "bunx drizzle-kit push && bun deploy-commands && bun start"]
