@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   extractAssistantPrompt,
   limitMultimodalAttachments,
+  toAssistantEmoji,
 } from "./assistant";
 
 describe("assistant message helpers", () => {
@@ -30,5 +31,17 @@ describe("assistant message helpers", () => {
 
     expect(limitMultimodalAttachments(attachments)).toHaveLength(4);
     expect(limitMultimodalAttachments(attachments).every(attachment => attachment.filename.endsWith(".png"))).toBe(true);
+  });
+
+  test("formats static and animated custom emojis for Discord", () => {
+    expect(toAssistantEmoji({ id: "123", name: "COPIUM", animated: false }, "Playful denial.")).toEqual({
+      id: "123",
+      name: "COPIUM",
+      token: "<:COPIUM:123>",
+      description: "Playful denial.",
+    });
+    expect(toAssistantEmoji({ id: "456", name: "hype", animated: true })).toMatchObject({
+      token: "<a:hype:456>",
+    });
   });
 });

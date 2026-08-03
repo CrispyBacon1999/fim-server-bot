@@ -58,6 +58,26 @@ describe("assistant OpenRouter request helpers", () => {
     expect(prompt).toContain("<current_request>\nSummarize that.");
   });
 
+  test("includes available server emojis and staff usage notes", () => {
+    const prompt = buildAssistantPrompt({
+      prompt: "React to that.",
+      context: [],
+      emojis: [{
+        id: "123",
+        name: "COPIUM",
+        token: "<:COPIUM:123>",
+        description: "Playful denial or wishful thinking, not serious disappointment.",
+      }],
+    });
+
+    expect(prompt).toContain("<available_server_emojis>");
+    expect(prompt).toContain("<:COPIUM:123> (COPIUM) - Staff usage note:");
+  });
+
+  test("makes an empty emoji catalog explicit", () => {
+    expect(buildAssistantPrompt({ prompt: "Hi", context: [] })).toContain("[No custom server emojis are available.]");
+  });
+
   test("forces search for current and event-specific requests", () => {
     expect(shouldForceWebSearch({ prompt: "What are the current Rainbow Rumble rules?", context: [] })).toBe(true);
     expect(shouldForceWebSearch({ prompt: "Rewrite this sentence", context: [] })).toBe(false);

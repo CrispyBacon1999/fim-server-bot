@@ -9,7 +9,10 @@ import {
   getAssistantAttachmentKind,
   type AssistantAttachment,
   type AssistantContextMessage,
+  type AssistantEmoji,
 } from "../ai/openrouter";
+import { eq } from "drizzle-orm";
+import { assistantEmojiGuideTable } from "../db/schema";
 
 const HISTORY_LIMIT = 8;
 const MULTIMODAL_ATTACHMENT_LIMIT = 4;
@@ -62,11 +65,17 @@ export async function assistantHandler(client: Client, message: Message): Promis
       ...currentAttachments,
       ...contextAttachments,
     ]);
+    const emojiGuides = await fetchEmojiGuides(message.guild.id);
+    const emojis = message.guild.emojis.cache
+      .filter(emoji => emoji.available !== false)
+      .map(emoji => toAssistantEmoji(emoji, emojiGuides.get(emoji.id)))
+      .sort((left, right) => left.name.localeCompare(right.name));
 
     const answer = await generateAssistantResponse({
       prompt,
       context: contextMessages,
       attachments,
+      emojis,
     });
 
     await replyWithoutMentions(message, fitDiscordMessage(answer));
@@ -110,6 +119,19 @@ export function toAssistantContextMessage(message: Message): AssistantContextMes
   };
 }
 
+export function toAssistantEmoji(
+  emoji: { id: string; name: string | null; animated: boolean | null },
+  description?: string,
+): AssistantEmoji {
+  const name = emoji.name ?? "emoji";
+  return {
+    id: emoji.id,
+    name,
+    token: `<${emoji.animated ? "a" : ""}:${name}:${emoji.id}>`,
+    ...(description ? { description } : {}),
+  };
+}
+
 export function limitMultimodalAttachments(attachments: AssistantAttachment[]): AssistantAttachment[] {
   const usableAttachments = attachments.filter(attachment => {
     const kind = getAssistantAttachmentKind(attachment);
@@ -144,6 +166,20 @@ async function fetchSurroundingContext(message: Message): Promise<AssistantConte
   } catch (error) {
     console.warn(`Unable to fetch surrounding context for message ${message.id}`, error);
     return [];
+  }
+}
+
+async function fetchEmojiGuides(guildId: string): Promise<Map<string, string>> {
+  try {
+    const { db } = await import("../db/db");
+    const guides = await db
+      .select({ emojiId: assistantEmojiGuideTable.emojiId, description: assistantEmojiGuideTable.description })
+      .from(assistantEmojiGuideTable)
+      .where(eq(assistantEmojiGuideTable.guildId, guildId));
+    return new Map(guides.map(guide => [guide.emojiId, guide.description]));
+  } catch (error) {
+    console.warn(`Unable to fetch assistant emoji guides for guild ${guildId}`, error);
+    return new Map();
   }
 }
 

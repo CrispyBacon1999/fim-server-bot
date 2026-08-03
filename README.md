@@ -18,6 +18,8 @@ Members with the `Manage Channels` permission can mention the bot in a message t
 
 Text requests use the configured OpenRouter DeepSeek model. Requests containing an image or PDF attachment use the configured multimodal fallback. The assistant can use OpenRouter's web search for current information, but normally keeps source links out of its short response.
 
+The assistant can use the invoking server's custom emojis when they fit naturally. Members with `Manage Channels` can use `/assistant-emoji set` to add a short usage note for a server emoji, `/assistant-emoji list` to review notes, and `/assistant-emoji remove` to delete one. Emoji notes are per-server and are stored in the database.
+
 The bot must have the Message Content intent enabled, along with `View Channel`, `Read Message History`, and `Send Messages` permissions. `OPENROUTER_API_KEY` must be set in the environment.
 
 This project was created using `bun init` in bun v1.2.11. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.

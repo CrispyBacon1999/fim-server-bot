@@ -44,3 +44,11 @@ export const honeypotConfigTable = mysqlTable("honeypot_configs", {
   channelId: varchar({ length: 32 }).notNull(),
   staffChannelId: varchar({ length: 32 }).notNull(),
 })
+
+export const assistantEmojiGuideTable = mysqlTable("assistant_emoji_guides", {
+  guildId: varchar({ length: 32 }).notNull(),
+  emojiId: varchar({ length: 32 }).notNull(),
+  description: varchar({ length: 500 }).notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.guildId, table.emojiId] }),
+]);
