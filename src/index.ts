@@ -4,6 +4,7 @@ import { ChannelType, Client, Collection, EmbedBuilder, Events, GatewayIntentBit
 import { voiceHandler } from "./modules/voice";
 import { reputationHandler } from "./modules/rep";
 import { honeypotHandler } from "./modules/honeypot";
+import { assistantHandler } from "./modules/assistant";
 import { Cron } from "croner";
 import { db } from "./db/db";
 import { reputationMessageConfigTable, reputationMessageTable } from "./db/schema";
@@ -62,6 +63,9 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
 client.on(Events.MessageCreate, async (message) => {
   const handledByHoneypot = await honeypotHandler(client, message);
   if (handledByHoneypot) return;
+
+  const handledByAssistant = await assistantHandler(client, message);
+  if (handledByAssistant) return;
 
   reputationHandler(client, message);
 });
