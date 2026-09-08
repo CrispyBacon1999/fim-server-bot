@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   DEEPSEEK_ASSISTANT_MODEL,
+  FREE_SUMMARY_MODEL,
   MULTIMODAL_ASSISTANT_MODEL,
   buildAssistantContent,
   buildAssistantPrompt,
@@ -9,6 +10,7 @@ import {
   selectAssistantModel,
   shouldForceWebSearch,
   stripWebCitations,
+  summarizeAssistantConversation,
 } from "./openrouter";
 
 describe("assistant OpenRouter request helpers", () => {
@@ -53,9 +55,32 @@ describe("assistant OpenRouter request helpers", () => {
       context: [{ author: "Alex", content: "The match starts at 9." }],
     });
 
-    expect(prompt).toContain("<discord_context>");
+    expect(prompt).toContain("<recent_focus>");
     expect(prompt).toContain("Alex");
     expect(prompt).toContain("<current_request>\nSummarize that.");
+  });
+
+  test("orders exact relevance ahead of timestamped older summaries", () => {
+    const prompt = buildAssistantPrompt({
+      prompt: "What about that one?",
+      directReplyFocus: [{ id: "reply", author: "Sam", content: "The blue robot.", createdTimestamp: 3 }],
+      recentFocus: [{ id: "recent", author: "Alex", content: "It passed inspection.", createdTimestamp: 4 }],
+      supportingRecentContext: [{ id: "support", author: "Jo", content: "Earlier exact context.", createdTimestamp: 2 }],
+      summary: {
+        content: "A much older red robot was discussed.",
+        sourceStartedAt: 0,
+        sourceEndedAt: 1,
+        generatedAt: 5,
+        model: "openrouter/free",
+        usedFallback: false,
+      },
+    });
+
+    expect(prompt.indexOf("<current_request>")).toBeLessThan(prompt.indexOf("<direct_reply_focus>"));
+    expect(prompt.indexOf("<direct_reply_focus>")).toBeLessThan(prompt.indexOf("<recent_focus>"));
+    expect(prompt.indexOf("<recent_focus>")).toBeLessThan(prompt.indexOf("<supporting_recent_context>"));
+    expect(prompt.indexOf("<supporting_recent_context>")).toBeLessThan(prompt.indexOf("<older_conversation_summary>"));
+    expect(prompt).toContain("Source range: 1970-01-01T00:00:00.000Z through 1970-01-01T00:00:00.001Z");
   });
 
   test("includes available server emojis and staff usage notes", () => {
@@ -81,6 +106,23 @@ describe("assistant OpenRouter request helpers", () => {
   test("forces search for current and event-specific requests", () => {
     expect(shouldForceWebSearch({ prompt: "What are the current Rainbow Rumble rules?", context: [] })).toBe(true);
     expect(shouldForceWebSearch({ prompt: "Rewrite this sentence", context: [] })).toBe(false);
+  });
+
+  test("does not let supporting context or an old summary force web search", () => {
+    expect(shouldForceWebSearch({
+      prompt: "Tell me more.",
+      directReplyFocus: [],
+      recentFocus: [],
+      supportingRecentContext: [{ author: "Alex", content: "Check the current event schedule." }],
+      summary: {
+        content: "They discussed today's weather.",
+        sourceStartedAt: 0,
+        sourceEndedAt: 1,
+        generatedAt: 2,
+        model: "openrouter/free",
+        usedFallback: false,
+      },
+    })).toBe(false);
   });
 
   test("removes web citation links while retaining answer text", () => {
@@ -172,5 +214,75 @@ describe("assistant OpenRouter request helpers", () => {
       engine: "exa",
       max_results: 5,
     }]);
+  });
+
+  test("summarizes with the free router without assistant web tools", async () => {
+    const originalFetch = globalThis.fetch;
+    let requestBody: Record<string, unknown> | undefined;
+    globalThis.fetch = (async (_input, init) => {
+      requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(JSON.stringify({
+        model: "google/gemma-4-31b-it:free",
+        choices: [{ message: { content: "Compact summary." } }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+
+    try {
+      await expect(summarizeAssistantConversation({ transcript: "Older messages." })).resolves.toEqual({
+        content: "Compact summary.",
+        model: "google/gemma-4-31b-it:free",
+        usedFallback: false,
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(requestBody?.model).toBe(FREE_SUMMARY_MODEL);
+    expect(requestBody?.tools).toBeUndefined();
+    expect(requestBody?.plugins).toBeUndefined();
+    expect(requestBody?.max_tokens).toBe(1_200);
+  });
+
+  test("retries any failed free summary once with DeepSeek", async () => {
+    const originalFetch = globalThis.fetch;
+    const requestBodies: Record<string, unknown>[] = [];
+    globalThis.fetch = (async (_input, init) => {
+      requestBodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      if (requestBodies.length === 1) {
+        return new Response(JSON.stringify({ choices: [{ message: { content: "" } }] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({
+        model: "deepseek/deepseek-v4-flash",
+        choices: [{ message: { content: "Fallback summary." } }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+
+    try {
+      await expect(summarizeAssistantConversation({ transcript: "Older messages." })).resolves.toEqual({
+        content: "Fallback summary.",
+        model: "deepseek/deepseek-v4-flash",
+        usedFallback: true,
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(requestBodies.map(body => body.model)).toEqual([FREE_SUMMARY_MODEL, DEEPSEEK_ASSISTANT_MODEL]);
+  });
+
+  test("surfaces an error when both summary models fail", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response("unavailable", { status: 503 })) as unknown as typeof fetch;
+
+    try {
+      await expect(summarizeAssistantConversation({ transcript: "Older messages." })).rejects.toThrow(
+        "Both OpenRouter conversation summarizers failed",
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

@@ -1,10 +1,10 @@
 import { readdir } from "fs/promises";
 import { join } from "path";
-import { ChannelType, Client, Collection, EmbedBuilder, Events, GatewayIntentBits } from "discord.js";
+import { ChannelType, Client, Collection, EmbedBuilder, Events, GatewayIntentBits, Partials } from "discord.js";
 import { voiceHandler } from "./modules/voice";
 import { reputationHandler } from "./modules/rep";
 import { honeypotHandler } from "./modules/honeypot";
-import { assistantHandler } from "./modules/assistant";
+import { assistantHandler, invalidateAssistantSummary } from "./modules/assistant";
 import { Cron } from "croner";
 import { db } from "./db/db";
 import { reputationMessageConfigTable, reputationMessageTable } from "./db/schema";
@@ -17,7 +17,8 @@ const client = new Client({
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildPresences,
     GatewayIntentBits.GuildMessages,
-  ]
+  ],
+  partials: [Partials.Message, Partials.Channel],
 });
 
 client.once(Events.ClientReady, readyClient => {
@@ -72,6 +73,14 @@ client.on(Events.MessageCreate, async (message) => {
   } catch (error) {
     console.error(`Unable to process message ${message.id}`, error);
   }
+});
+
+client.on(Events.MessageUpdate, (oldMessage, newMessage) => {
+  invalidateAssistantSummary(newMessage.channelId, newMessage.id);
+});
+
+client.on(Events.MessageDelete, message => {
+  invalidateAssistantSummary(message.channelId, message.id);
 });
 
 client.login(process.env.DISCORD_TOKEN);
