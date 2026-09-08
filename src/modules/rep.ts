@@ -3,6 +3,7 @@ import { db } from "../db/db";
 import { reputationMessageTable } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { isThankingReply } from "../ai/openrouter";
+import { fetchReferencedMessage } from "./message-reference";
 
 export async function reputationHandler(client: Client, message: Message) {
   if (message.author.bot) return;
@@ -36,7 +37,8 @@ export async function reputationHandler(client: Client, message: Message) {
 
   if (!message.reference?.messageId) return;
 
-  const referenceMessage = await message.channel.messages.fetch(message.reference.messageId);
+  const referenceMessage = await fetchReferencedMessage(message, message.reference.messageId);
+  if (!referenceMessage) return;
 
   // Can't thank yourself
   if (message.author.id === referenceMessage.author.id) return;

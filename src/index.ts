@@ -61,13 +61,17 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
 })
 
 client.on(Events.MessageCreate, async (message) => {
-  const handledByHoneypot = await honeypotHandler(client, message);
-  if (handledByHoneypot) return;
+  try {
+    const handledByHoneypot = await honeypotHandler(client, message);
+    if (handledByHoneypot) return;
 
-  const handledByAssistant = await assistantHandler(client, message);
-  if (handledByAssistant) return;
+    const handledByAssistant = await assistantHandler(client, message);
+    if (handledByAssistant) return;
 
-  reputationHandler(client, message);
+    await reputationHandler(client, message);
+  } catch (error) {
+    console.error(`Unable to process message ${message.id}`, error);
+  }
 });
 
 client.login(process.env.DISCORD_TOKEN);
